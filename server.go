@@ -6,16 +6,11 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"github.com/gorilla/mux"
 	"encoding/json"
-	"errors"
 	"strconv"
 )
 
-type rtc_int_token_struct struct {
-	Uid_rtc_int uint32 "json:\"uid\""
-	Channel_name string "json:\"ChannelName\""
-	Role uint32 "json:\"role\""
-}
 
 var rtc_token string
 var int_uid uint32
@@ -28,7 +23,7 @@ func generateRtcToken(int_uid uint32, channelName string, role rtctokenbuilder.R
 	
 	appID := "9998def41eae49c6b7169b2c46a044f1"
 	appCertificate := "00e4546550324d38af42d99ecac06ecd"
-	expireTimeInSeconds := uint32(40)
+	expireTimeInSeconds := uint32(50)
 	currentTimestamp := uint32(time.Now().UTC().Unix())
 	expireTimestamp := currentTimestamp + expireTimeInSeconds
 
@@ -44,7 +39,7 @@ func generateRtcToken(int_uid uint32, channelName string, role rtctokenbuilder.R
 	rtc_token = result	
 }
 
-func rtcTokenHandler(w http.ResponseWriter, r *http.Request) {
+func rtc(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -61,35 +56,31 @@ func rtcTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var t_int rtc_int_token_struct
-	var unmarshalErr *json.UnmarshalTypeError
-	int_decoder := json.NewDecoder(r.Body)
-	int_err := int_decoder.Decode(&t_int)
-
-	if (int_err == nil) {
-		int_uid = t_int.Uid_rtc_int
-		channel_name = t_int.Channel_name
-		role_num = t_int.Role
-
-		switch role_num {
-		case 0:
-			role = rtctokenbuilder.RoleAttendee
-		case 1:
-			role = rtctokenbuilder.RolePublisher
-		case 2:
-			role = rtctokenbuilder.RoleSubscriber
-		case 101:
-			role = rtctokenbuilder.RoleAdmin
-		}
-	}
-	if (int_err != nil) {
-
-		if errors.As(int_err, &unmarshalErr) {
-			errorResponse(w, "Bad request. Wrong type provided for field " + unmarshalErr.Value + unmarshalErr.Field + unmarshalErr.Struct, http.StatusBadRequest)
-		} else {
-			errorResponse(w, "Bad request.", http.StatusBadRequest)
-		}
+	ChannelName, err1 := mux.Vars(r)["channelName"]
+	if err1 != true {
+		fmt.Printf("ChannelName Failed ::: %s\n", err1)
 		return
+	} else {
+		channel_name = ChannelName
+		fmt.Printf("ChannelName Success ::: %s\n", ChannelName)
+	}
+
+	Role, err2 := mux.Vars(r)["role"]
+	if err2 != true {
+		fmt.Printf("Role Failed ::: %s\n", err2)
+		return
+	} else {
+		role = rtctokenbuilder.RolePublisher
+		fmt.Printf("Role Success ::: %s\n", Role)
+	}
+
+	UidStr, err3 := strconv.ParseInt(mux.Vars(r)["uid"], 10, 64)
+	if err3 != nil {
+		fmt.Printf("UID Failed ::: %s\n", err3)
+		return
+	} else {
+		int_uid = 1
+		fmt.Printf("UID Success ::: %d\n", UidStr)
 	}
 
 	generateRtcToken(int_uid, channel_name, role)
@@ -115,9 +106,9 @@ func rootPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/fetch_rtc_token", rtcTokenHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/", rootPage)
+	router.HandleFunc("/rtc/{channelName}/{role}/{uid}", rtc)
 	fmt.Println("Starting server at http://127.0.0.1:8082\n")
-	if err := http.ListenAndServe(":8082", nil); err != nil {
-		log.Fatal(err)
-	}
+	log.Fatal(http.ListenAndServe(":8082", router))
 }
