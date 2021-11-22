@@ -105,10 +105,12 @@ func rootPage(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("This is root page"))
 }
 
+const port = "8080"
+
 func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/", rootPage)
 	router.HandleFunc("/rtc/{channelName}/{role}/{uid}", rtc)
-	fmt.Println("Starting server at http://127.0.0.1:8082\n")
-	log.Fatal(http.ListenAndServe(":8082", router))
+	fmt.Println("Starting server at http://127.0.0.1:" +port)
+	log.Fatal(http.ListenAndServe(":" +port, router))
 }
